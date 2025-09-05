@@ -6,7 +6,7 @@ import {
 } from 'typeorm';
 
 @Entity()
-export class Auth {
+export class ActiveToken {
   @PrimaryGeneratedColumn()
   id: number;
 

@@ -1,26 +1,47 @@
-import { Injectable } from '@nestjs/common';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { UsersService } from '../users/users.service';
+import { JwtService } from '@nestjs/jwt';
+import { Repository } from 'typeorm';
+import { ActiveToken } from './entities/active-token';
+import { InjectRepository } from '@nestjs/typeorm';
+import { BlacklistedToken } from './entities/blacklisted-token';
+import { LogInDto } from './dto/log-in.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
-  create(createAuthDto: CreateAuthDto) {
-    return 'This action adds a new auth';
-  }
+  constructor(
+    private readonly userService: UsersService,
+    private readonly jwtService: JwtService,
+    @InjectRepository(ActiveToken)
+    private activeTokenRepository: Repository<ActiveToken>,
+    @InjectRepository(BlacklistedToken)
+    private blacklistTokenRepository: Repository<BlacklistedToken>,
+  ) {}
 
-  findAll() {
-    return `This action returns all auth`;
-  }
+  async LogIn({ email, password }: LogInDto) {
+    const user = await this.userService.findByEmail(email);
+    if (!user) {
+      throw new UnauthorizedException('Email incorrecto');
+    }
 
-  findOne(id: number) {
-    return `This action returns a #${id} auth`;
-  }
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Password incorrecto');
+    }
 
-  update(id: number, updateAuthDto: UpdateAuthDto) {
-    return `This action updates a #${id} auth`;
-  }
+    const payload = { sub: user.id, username: user.name, email: user.email };
+    const access_token = await this.jwtService.signAsync(payload);
 
-  remove(id: number) {
-    return `This action removes a #${id} auth`;
+    // Guardar el token activo en la base de datos
+    const activeToken = this.activeTokenRepository.create({
+      email: user.email,
+      token: access_token,
+    });
+    await this.activeTokenRepository.save(activeToken);
+
+    return {
+      access_token,
+    };
   }
 }

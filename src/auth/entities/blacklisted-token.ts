@@ -6,16 +6,13 @@ import {
 } from 'typeorm';
 
 @Entity()
-export class Auth {
+export class BlacklistedToken {
   @PrimaryGeneratedColumn()
   id: number;
-
-  @Column()
-  email: string;
 
   @Column({ unique: true })
   token: string;
 
   @CreateDateColumn()
-  createdAt: Date;
+  revokedAt: Date;
 }
